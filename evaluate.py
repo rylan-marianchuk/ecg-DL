@@ -16,6 +16,7 @@ def evaluateContinuous(te_dataloader, ds_test, model, device, batch_size, saveTo
     :param batch_size: (int)
     :param saveToDisk: (bool) whether to save as html file
     """
+    model.eval()
     with torch.no_grad():
         y_pred = torch.zeros(ds_test.n_obs)
         y_true = torch.zeros(ds_test.n_obs)
@@ -43,7 +44,7 @@ def evaluateContinuous(te_dataloader, ds_test, model, device, batch_size, saveTo
 
     if saveToDisk:
         D = {'ids':hovertexts, 'y_true':y_true, 'y_pred':y_pred}
-        torch.save(D, "true-pred.pt")
+        torch.save(D, "true-pred-test.pt")
 
 def evaluateBinary():
     return
