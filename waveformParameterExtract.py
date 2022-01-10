@@ -1,8 +1,11 @@
 import torch
 from transforms import PowerSpec
 from decodeLeads import getLeads
-import xml.etree.ElementTree as ET
 from ecgDataset import ecgDataset
+import itertools
+import math
+import torch.nn as nn
+from statsmodels.tsa.stattools import acf
 
 def areaofPower(ds):
     """
@@ -13,7 +16,7 @@ def areaofPower(ds):
     dist = torch.zeros(len(ds), ds.n_leads)
     power = PowerSpec(normalize=True)
     for i in range(len(ds)):
-        ecg = getLeads(ET.parse(ds.src + "/" + ds.filenames[i]), ds.n_leads)
+        ecg = getLeads(ds.src + "/" + ds.filenames[i], ds.n_leads)
         for j,lead in enumerate((ecg)):
             dist[i,j] = torch.sum(power(lead)).item()
     return dist
@@ -24,7 +27,7 @@ def curveLength(ds):
     """
     dist = torch.zeros(len(ds), ds.n_leads)
     for i in range(len(ds)-5000):
-        ecg = getLeads(ET.parse(ds.src + "/" + ds.filenames[i]), ds.n_leads)
+        ecg = getLeads(ds.src + "/" + ds.filenames[i], ds.n_leads)
         for j,lead in enumerate((ecg)):
             L = 0
             for x in range(lead.shape[0] - 1):
@@ -35,13 +38,52 @@ def curveLength(ds):
 def entropy_of_hist(ds):
     dist = torch.zeros(len(ds), ds.n_leads)
     for i in range(len(ds)):
-        ecg = getLeads(ET.parse(ds.src + "/" + ds.filenames[i]), ds.n_leads)
+        ecg = getLeads(ds.src + "/" + ds.filenames[i], ds.n_leads)
         for j,lead in enumerate((ecg)):
             vals, bins = torch.histogram(lead, bins=40, density=True)
             dist[i,j] = -torch.sum(torch.log2(vals) * vals).item()
     return dist
 
+def weights(signal):
+    seg_size = 250
+    segments = 5000 // seg_size
+    remainder = 5000 % seg_size
+    nlags = 30
+
+    ACFs = torch.zeros(segments, nlags+1)
+    cosSim = nn.CosineSimilarity(dim=0)
+
+    for i,x in enumerate(range(0, 5000, seg_size)):
+        if i == segments: break
+        segment = signal[x:x+seg_size]
+        ACF = acf(segment.numpy(), nlags=nlags)
+        ACF = torch.from_numpy(ACF)
+        ACFs[i] = ACF
+
+    pairwiseM = torch.zeros(segments, segments)
+
+    for i,j in itertools.combinations(range(segments), r=2):
+        A1 = ACFs[i]
+        A2 = ACFs[j]
+        similarity = cosSim(A1, A2)
+        if not (0 <= similarity <= 1):
+            similarity = min(similarity, 1.00)
+        theta = math.acos(similarity)
+        pairwiseM[i,j] = theta
+        pairwiseM[j,i] = theta
+
+    return torch.sum(pairwiseM, dim=1)
+
+def AreaofAutocorrelationSegs(ds):
+    dist = torch.zeros(len(ds), ds.n_leads)
+    for i in range(len(ds)):
+        ecg = getLeads(ds.src + "/" + ds.filenames[i], ds.n_leads)
+        for j,lead in enumerate((ecg)):
+            dist[i,j] = weights(lead).sum().item()
+    return dist
+
+
 ds = ecgDataset("ALL-max-amps.pt")
-#entropy_of_hist(ds[235][0][0])
+
 #ds.viewByParameter(areaofPower(ds), "Area of Power Spectrum")
 print()

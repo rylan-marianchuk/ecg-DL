@@ -3,14 +3,15 @@ from decodeLeads import getLeads
 from torch.utils.data import Dataset
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
+import pandas as pd
 
 class ecgDataset(Dataset):
 
     def __init__(self, acquiredDSFile, transform=None):
         """
         Dataset is ordered
-        :param acquiredDSFile:
-        :param transform:
+        :param acquiredDSFile: (str) to the .pt datatset
+        :param transform: the by-lead transform to apply in __getitem__()
         """
         self.acquiredDSFile = torch.load(acquiredDSFile)
         self.src = self.acquiredDSFile["src"]
@@ -23,9 +24,13 @@ class ecgDataset(Dataset):
         self.n_obs = self.acquiredDSFile["n_obs"]
         self.lead_names = ("I", "II", "V1", "V2", "V3", "V4", "V5", "V6") if self.n_leads == 8 \
             else ("I", "II", "V1", "V2", "V3", "V4", "V5", "V6", "III", "aVL", "aVR", "aVF")
+        self.prediction_assigned = False
+        self.predictions = torch.Tensor([])
+        self.prediction_ids = []
 
     def __len__(self):
         return self.acquiredDSFile["encounters"]
+
 
     def __getitem__(self, idx):
         if isinstance(idx, int):
@@ -44,6 +49,7 @@ class ecgDataset(Dataset):
             return str(self.filenames.index(filestring))
         return self.filenames.index(filestring)
 
+
     def singleidx(self, id):
         ecg = getLeads(self.src + "/" + self.filenames[id], self.n_leads)
         if self.single_lead_obs:
@@ -51,9 +57,31 @@ class ecgDataset(Dataset):
             return ecg, torch.stack(self.targets[id]).flatten(), [s_id + " " + leadID for leadID in self.lead_names]
         return ecg, self.targets[id], id
 
+
     def numerousidx(self, idx):
         for id in idx:
             return self.singleidx(id)
+
+
+    def denoteArtifact(self, index, leadid):
+        """
+        Write to file containing all found artifacts
+        """
+        df = pd.DataFrame()
+        df["filename"] = [self.filenames[index]]
+        df["lead"] = [leadid]
+        with open('artifacts.csv', 'a') as f:
+            df.to_csv(f, header=False, index=False)
+
+
+    def assignPredictions(self, preds):
+        """
+        :param preds: (tensor) of model outputs, shape=(n_obs,)
+        """
+        pred_true_file = torch.load(preds)
+        self.predictions = pred_true_file["y_pred"]
+        self.prediction_ids = pred_true_file["ids"]
+        self.prediction_assigned = True
 
 
     def viewECG(self, index, leadid=None, saveToDisk=False):
@@ -70,22 +98,37 @@ class ecgDataset(Dataset):
         if leadid is not None:
             lead_index = self.lead_names.index(leadid)
             fig = go.Figure(go.Scatter(y=ecg[lead_index], mode='markers', marker=dict(color='red')))
+            title = "Electrocardiogram of dataset index <b>" + str(index) + " " + leadid + \
+                    "</b><br>File:  " + filename + \
+                    "<br>Target:  " + str(targets[lead_index])
+            if self.prediction_assigned:
+                v = self.prediction_ids.index(str(index) + " " + leadid)
+                title += "<br>Prediction:  " + str(self.predictions[v])
+
             fig.update_layout(
-                title="Electrocardiogram of index  " + str(index) + " " + leadid + "      File: " + filename +
-                      "     Target:  " + str(targets[lead_index]),
+                title=title,
                 yaxis_title="Amplitude (mV)",
                 xaxis_title="Sample Number"
             )
 
             if saveToDisk:
-                fig.write_html("ECG-" + filename[:-4] + "-" + leadid + ".html")
+                fig.write_html("ECG-" + filename[:-4] + "-index-" + str(index) + "-" + leadid + ".html")
             else:
                 fig.show()
             return
 
+        subplot_titles = [self.lead_names[i] for i in range(self.n_leads)]
+        if self.single_lead_obs:
+            for i in range(self.n_leads):
+                subplot_titles[i] += "<br>Target:  " + str(targets[i])
+            if self.prediction_assigned:
+                for i in range(self.n_leads):
+                    v = self.prediction_ids.index(str(index) + " " + self.lead_names[i])
+                    subplot_titles[i] += "<br>Prediction:  " + str(self.predictions[v])
+
         fig = make_subplots(
             rows=4, cols=2,
-            subplot_titles=[self.lead_names[i] + "  " + str(targets[i]) for i in range(self.n_leads)])
+            subplot_titles=subplot_titles)
 
         fig.add_trace(go.Scatter(y=ecg[0], mode='markers', marker=dict(color='red')),
             row=1, col=1)
@@ -111,10 +154,19 @@ class ecgDataset(Dataset):
         fig.add_trace(go.Scatter(y=ecg[7], mode='markers', marker=dict(color='red')),
             row=4, col=2)
 
-        fig.update_layout(title_text=filename)
+
+        master_title = "Electrocardiogram of dataset index <b>" + str(index) + \
+                       "</b><br>File:  " + filename
+
+        if not self.single_lead_obs:
+            master_title += "<br>Target:  " + str(targets[index])
+            if self.prediction_assigned:
+                master_title += "<br>Prediction:  " + str(self.predictions[index])
+
+        fig.update_layout(title_text=master_title)
 
         if saveToDisk:
-            fig.write_html("8-LeadECG-" + filename[:-4] + ".html")
+            fig.write_html("8-LeadECG-" + filename[:-4] + "-index-" + str(index) + ".html")
         else:
             fig.show()
 
@@ -187,3 +239,8 @@ class ecgDataset(Dataset):
             fig.show()
 
 
+
+ds = ecgDataset("/home/rylan/PycharmProjects/newDL/ALL-max-amps.pt")
+ds.viewECG(8158, "II")
+
+print()
