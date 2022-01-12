@@ -106,7 +106,7 @@ class Wu(nn.Module):
             nn.Dropout(0.3),
 
             nn.Flatten(),
-            nn.Linear(5120, 128),
+            nn.Linear(10752, 128),
             nn.ReLU(),
             nn.Dropout(),
             nn.Linear(128, 1)

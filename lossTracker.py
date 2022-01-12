@@ -123,7 +123,7 @@ class LossTracker:
                                        hovertemplate='%{text}'+
                                                      '<br><b>log10 MSE Loss<b>: %{y:.2f}'+
                                                      '<br>Epoch: %{x:.0f}',
-                                       text = ['<i>Pred</i>: {pred:.2f}<br><i>True</i>: {true:.2f}'.format(true=true[i], pred=pred[i]) for i in range(len(indices))]
+                                       text = ['<i>Pred</i>: {pred:.2f}<br><i>True</i>: {true:.2f}'.format(true=true[i], pred=pred[i]) for i in indices.flatten()]
                                        ))
 
 
@@ -160,7 +160,7 @@ class LossTracker:
         )
 
         if saveToDisk:
-            f.write_html("./" + title[0] + "-loss-tracking.html")
+            f.write_html("./" + title.split(" ")[0] + "-loss-tracking.html")
         else:
             f.show()
 

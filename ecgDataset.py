@@ -52,6 +52,8 @@ class ecgDataset(Dataset):
 
     def singleidx(self, id):
         ecg = getLeads(self.src + "/" + self.filenames[id], self.n_leads)
+        if self.transform is not None:
+            ecg = self.transform(ecg)
         if self.single_lead_obs:
             s_id = str(id)
             return ecg, torch.stack(self.targets[id]).flatten(), [s_id + " " + leadID for leadID in self.lead_names]
@@ -238,9 +240,3 @@ class ecgDataset(Dataset):
         else:
             fig.show()
 
-
-
-ds = ecgDataset("/home/rylan/PycharmProjects/newDL/ALL-max-amps.pt")
-ds.viewECG(8158, "II")
-
-print()

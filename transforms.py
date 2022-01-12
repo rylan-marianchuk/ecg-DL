@@ -18,6 +18,7 @@ September 2021
 import plotly.graph_objs as go
 
 import torch
+import torch.nn.functional as F
 import pywt
 import math
 
@@ -240,7 +241,7 @@ class PowerSpec:
 
 
 class Wavelet:
-    def __init__(self, widths, wavelet='mexh', T=10, fs=500, normalize=False):
+    def __init__(self, widths, output_size=None, wavelet='mexh', T=10, fs=500, normalize=False):
         """
         :param widths: (1D array) sequence of increasing wavelet widths, used as scale axis
         :param wavelet: (str) the chosen wavelet type. Options may be viewed with .seeAvailableWavelets()
@@ -253,40 +254,56 @@ class Wavelet:
         self.normalize = normalize
         self.wavelet = wavelet
         self.widths = widths
-        self.domain = { 0 : widths, # each row a wavelet width is selected and translated across time
-                        1: torch.linspace(0, T, T*fs)} # linear time domain sequence
-        self.domain_shape = (len(widths), T*fs)
+        self.n_widths = len(widths)
+        self.domain_shape = (1, len(widths), T*fs)
+        self.output_size = output_size
+        if output_size is not None:
+            self.domain_shape = (1, output_size[0], output_size[1])
+
+        self.domain = { 0 : torch.linspace(widths.min(), widths.max(), self.domain_shape[1]), # each row a wavelet width is selected and translated across time
+                        1: torch.linspace(0, T, self.domain_shape[2])} # linear time domain sequence
         return
 
-    def __call__(self, signal):
+    def __call__(self, ecg):
         """
         Transform the signal to its image of wavelet coefficients
-        :param signal: (float) shape=(n,) to transform
-        :return: (float) shape=domain_shape 2D image of wavelet coefs
+        :param ecg: (tensor) shape=(n_leads,5000) to transform
+        :return: (tensor) shape= 2D image of wavelet coefs
         """
-        assert (signal.shape[0] == self.T*self.fs), "The signal is not corresponding to the specified time length and" \
-                                                    "sample frequency"
+        if len(ecg.shape) == 1:
+            ecg = ecg.reshape(1, ecg.shape[0])
+        trfm = pywt.cwt(ecg.numpy(), self.widths.numpy(), self.wavelet)[0]
+        trfm = torch.from_numpy(trfm).transpose(0, 1)
+        trfm = trfm.unsqueeze(1)
+        if self.output_size is not None:
+            trfm = F.interpolate(trfm, size=self.output_size)
+
         if self.normalize:
-            trfm = pywt.cwt(signal, self.widths, self.wavelet)[0]
-            trfm -= torch.min(trfm)
-            trfm /= torch.max(trfm) - torch.min(trfm)
-            return trfm
-        return pywt.cwt(signal, self.widths, self.wavelet)[0]
+            for i in range(ecg.shape[0]):
+                trfm[i] -= torch.min(trfm[i])
+                trfm[i] /= torch.max(trfm[i]) - torch.min(trfm[i])
+
+        return trfm
 
     def seeAvailableWavelets(self):
         print(pywt.wavelist(kind='continuous'))
 
-    def view(self, signal):
+    def view(self, ecg, index=0):
         """
         Generate plotly graph object to visualize the transform
-        :param signal: (float) shape=(n,) to transform
+        :param ecg: (tensor) shape=(n_leads,5000) to transform
+        :param index:
         :return: viewable Heatmap plot viewing all wavelet coefficients at a given scale and translation time
         """
-        trfm = self(signal)
-        fig = go.Figure(data=go.Heatmap(z=trfm, x=self.domain[1], y=self.domain[0]))
+        trfm = self(ecg)
+        fig = go.Figure(data=go.Heatmap(z=trfm[index][0], x=self.domain[1], y=self.domain[0].flip(0)))
         fig.update_layout(title="Wavelet Transform  -  Wavelet: " + str(self.wavelet))
         fig.update_yaxes(title_text="Wavelet scale", type='category')
         fig.update_xaxes(title_text="Time (seconds)", type='category')
+        fig.update_yaxes(
+            scaleanchor="x",
+            scaleratio=1
+        )
         fig.show()
 
 

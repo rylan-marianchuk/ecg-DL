@@ -1,3 +1,5 @@
+import time
+
 import torch
 from transforms import PowerSpec
 from decodeLeads import getLeads
@@ -6,6 +8,7 @@ import itertools
 import math
 import torch.nn as nn
 from statsmodels.tsa.stattools import acf
+from approxEntropy.apentropy_binding import apentropyPY
 
 def areaofPower(ds):
     """
@@ -21,6 +24,7 @@ def areaofPower(ds):
             dist[i,j] = torch.sum(power(lead)).item()
     return dist
 
+
 def curveLength(ds):
     """
     :return:
@@ -35,6 +39,7 @@ def curveLength(ds):
             dist[i,j] = L
     return dist
 
+
 def entropy_of_hist(ds):
     dist = torch.zeros(len(ds), ds.n_leads)
     for i in range(len(ds)):
@@ -42,6 +47,17 @@ def entropy_of_hist(ds):
         for j,lead in enumerate((ecg)):
             vals, bins = torch.histogram(lead, bins=40, density=True)
             dist[i,j] = -torch.sum(torch.log2(vals) * vals).item()
+    return dist
+
+
+def all_entropy(ds):
+    dist = torch.zeros(len(ds), ds.n_leads)
+    start = time.time()
+    for i in range(len(ds)):
+        ecg = getLeads(ds.src + "/" + ds.filenames[i], ds.n_leads).numpy().astype('float64')
+        for j,lead in enumerate((ecg)):
+            dist[i,j] = apentropyPY(ecg[j], 5000, m=2, r=3)
+    print("Total time: " + str(time.time() - start))
     return dist
 
 def weights(signal):
@@ -83,7 +99,7 @@ def AreaofAutocorrelationSegs(ds):
     return dist
 
 
-ds = ecgDataset("ALL-max-amps.pt")
+ds = ecgDataset("/home/rylan/PycharmProjects/newDL/ALL-max-amps.pt")
 
-#ds.viewByParameter(areaofPower(ds), "Area of Power Spectrum")
+ds.viewByParameter(all_entropy(ds), "ApproximateEntropy", saveToDisk=True)
 print()

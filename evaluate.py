@@ -38,7 +38,7 @@ def evaluateContinuous(te_dataloader, ds_test, model, device, batch_size, saveTo
             batch += 1
 
         rmeanloss = torch.mean(torch.sqrt((y_true - y_pred) * (y_true - y_pred)))
-        print("Root Mean loss:  " + str(rmeanloss))
+        print("Test Root Mean loss:  " + str(rmeanloss))
         regression_performance(y_true, y_pred, hovertexts, saveToDisk)
         bland_altman(y_true, y_pred, hovertexts, saveToDisk)
 
