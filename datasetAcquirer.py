@@ -52,7 +52,7 @@ class datasetAcquirer:
         :return: write the DS (DataSet) as a .pt object
         """
         dataset = {}
-        for filename in os.listdir(self.src)[:12000]:
+        for filename in os.listdir(self.src)[12000:]:
             try:
                 if filename[-4:] == ".xml":
                     ecg, tree = self.readxml(filename)
@@ -149,13 +149,19 @@ class datasetAcquirer:
         :return: (tensor) or (list of tensors) of the target. If (list) then single_lead_obs=True, a tensor for each lead
         """
         # TODO Acquire target here
-        return torch.split(torch.max(ecg, dim=1)[0], 1)
+        b1 = torch.vstack((ecg[0:3, 0:2496], ecg[6, 0:2496]))
+        b2 = torch.vstack((ecg[2:5, 2500:3748], ecg[1, 2500:3748], ecg[6, 2500:3748]))
+        b3 = torch.vstack((ecg[5:, 3752:], ecg[1:3, 3752:]))
+        b1_max = torch.max(b1).item()
+        b2_max = torch.max(b2).item()
+        b3_max = torch.max(b3).item()
+        return torch.max(torch.Tensor([b1_max, b2_max, b3_max]))
 
 start = time.time()
 acquire = datasetAcquirer(src="/home/rylan/May_2019_XML",
-                          outfile="Train-max-amps.pt",
-                          target_desc="Max Amplitude",
+                          outfile="/home/rylan/DeepLearningRuns/MaxAmplitudeByLead/AF/Test-max-amps-AF.pt",
+                          target_desc="Max Amplitude across all Leads",
                           n_leads=8,
-                          single_lead_obs=True,
+                          single_lead_obs=False,
                           filter_artifacts=True)
 print(time.time() - start)

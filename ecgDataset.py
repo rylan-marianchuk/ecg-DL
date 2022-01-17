@@ -52,12 +52,12 @@ class ecgDataset(Dataset):
 
     def singleidx(self, id):
         ecg = getLeads(self.src + "/" + self.filenames[id], self.n_leads)
+        s_id = str(id)
         if self.transform is not None:
             ecg = self.transform(ecg)
         if self.single_lead_obs:
-            s_id = str(id)
             return ecg, torch.stack(self.targets[id]).flatten(), [s_id + " " + leadID for leadID in self.lead_names]
-        return ecg, self.targets[id], id
+        return ecg, self.targets[id], s_id
 
 
     def numerousidx(self, idx):
@@ -72,7 +72,12 @@ class ecgDataset(Dataset):
         df = pd.DataFrame()
         df["filename"] = [self.filenames[index]]
         df["lead"] = [leadid]
-        with open('artifacts.csv', 'a') as f:
+
+        artfact_src = '/home/rylan/DeepLearningRuns/artifacts.csv'
+        table = pd.read_csv(artfact_src)
+        if df["filename"].item() in table["filename"].to_list():
+            return
+        with open(artfact_src, 'a') as f:
             df.to_csv(f, header=False, index=False)
 
 
@@ -100,9 +105,10 @@ class ecgDataset(Dataset):
         if leadid is not None:
             lead_index = self.lead_names.index(leadid)
             fig = go.Figure(go.Scatter(y=ecg[lead_index], mode='markers', marker=dict(color='red')))
+            target_str = str(targets[lead_index]) if self.single_lead_obs else str(targets)
             title = "Electrocardiogram of dataset index <b>" + str(index) + " " + leadid + \
                     "</b><br>File:  " + filename + \
-                    "<br>Target:  " + str(targets[lead_index])
+                    "<br>Target:  " + str(target_str)
             if self.prediction_assigned:
                 v = self.prediction_ids.index(str(index) + " " + leadid)
                 title += "<br>Prediction:  " + str(self.predictions[v])
@@ -161,7 +167,7 @@ class ecgDataset(Dataset):
                        "</b><br>File:  " + filename
 
         if not self.single_lead_obs:
-            master_title += "<br>Target:  " + str(targets[index])
+            master_title += "<br>Target:  " + str(targets)
             if self.prediction_assigned:
                 master_title += "<br>Prediction:  " + str(self.predictions[index])
 

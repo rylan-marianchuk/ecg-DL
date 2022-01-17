@@ -51,3 +51,13 @@ def getLeads(path2file, n_leads):
 
     return ECG
 
+
+def getNbeats(path2file):
+    """
+    Extract the generated QRS identifier within the xml,
+    :param path2file: (str) path to read xml file
+    :return: (int) number of heart beats in the signal
+    """
+    tree = ET.parse(path2file)
+    qrs_times = tree.find(".//QRSTimesTypes").findall(".//QRS")
+    return len(qrs_times)

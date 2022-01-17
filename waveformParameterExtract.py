@@ -61,7 +61,7 @@ def all_entropy(ds):
     return dist
 
 def weights(signal):
-    seg_size = 250
+    seg_size = 1250
     segments = 5000 // seg_size
     remainder = 5000 % seg_size
     nlags = 30
@@ -99,7 +99,3 @@ def AreaofAutocorrelationSegs(ds):
     return dist
 
 
-ds = ecgDataset("/home/rylan/PycharmProjects/newDL/ALL-max-amps.pt")
-
-ds.viewByParameter(all_entropy(ds), "ApproximateEntropy", saveToDisk=True)
-print()

@@ -217,9 +217,9 @@ class AF(nn.Module):
 
     def forward(self, b1, b2, b3):
         """
-        :param b1: shape=(4, 2496) first 5 seconds of leads I, II, V1, V5
-        :param b2: shape=(5, 1248) seconds 5-7.5 of leads V1, V2, V3, II, V5
-        :param b3: shape=(5, 1248) seconds 7.5-10 of leads V4, V5, V6, II, V1
+        :param b1: shape=(1, 4, 2496) first 5 seconds of leads I, II, V1, V5
+        :param b2: shape=(1, 5, 1248) seconds 5-7.5 of leads V1, V2, V3, II, V5
+        :param b3: shape=(1, 5, 1248) seconds 7.5-10 of leads V4, V5, V6, II, V1
         :return: scalar prediction
         """
         b1 = self.first_conv(b1)
