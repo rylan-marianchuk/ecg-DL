@@ -5,14 +5,17 @@ from pydicom import dcmread
 import xml.etree.ElementTree as ET
 from decodeLeads import getLeads
 from artifactNoise import checkZeroVec
+import random
 
 class datasetAcquirer:
 
-    def __init__(self, src, outfile, target_desc, n_leads=8, single_lead_obs=False, filter_artifacts=True, **kwarg_mask):
+    def __init__(self, src, dst, target_desc, test_train_split=None, n_leads=8, single_lead_obs=False, filter_artifacts=True, **kwarg_mask):
         """
         :param src: collection of Electrocardiograms in either DICOM or XML filetype #TODO directory or SQL db?
-        :param outfile: (str)
+        :param dst: (str) output directory to place datasets (train & test)
         :param target_desc: (str) a high level description of the target for this dataset
+        :param test_train_split: (float) if None, do not split the dataset. If float between 0 and 1, apply proportion
+                                split and save two datasets.
         :param n_leads: (int) 8 or 12, the number of leads desired. If 12, leads III, aVR, aVF, aVL are computed
         :param single_lead_obs: (bool) whether to count each lead as an independent observation in the dataset
         :param filter_artifacts: (bool) whether to apply automated signal artifact detection, throwing away artifacts
@@ -25,24 +28,52 @@ class datasetAcquirer:
             (dictionaries for O(1) lookup)
         """
         self.src = src
+        self.dst = dst
+        self.test_train_split = test_train_split
         self.filter_artifacts = filter_artifacts
         self.kwarg_mask = kwarg_mask
         self.n_leads = n_leads
         self.single_lead_obs = single_lead_obs
-        self.acquiredDSFile = {}
-        self.acquiredDSFile["n_leads"] = n_leads
-        self.acquiredDSFile["single_lead_obs"] = single_lead_obs
-        self.acquiredDSFile["filter_artifacts"] = filter_artifacts
-        self.acquiredDSFile["kwarg_mask"] = kwarg_mask
-        self.acquiredDSFile["target_desc"] = target_desc
-        self.acquiredDSFile["src"] = src
 
-        dataset = self.writeDataset()
-        encounters = len(dataset)
-        self.acquiredDSFile["encounters"] = encounters
-        self.acquiredDSFile["n_obs"] = encounters if not single_lead_obs else encounters * n_leads
-        self.acquiredDSFile["dataset"] = dataset
-        torch.save(self.acquiredDSFile, outfile)
+        acquiredDSFile = {}
+        acquiredDSFile["n_leads"] = n_leads
+        acquiredDSFile["single_lead_obs"] = single_lead_obs
+        acquiredDSFile["filter_artifacts"] = filter_artifacts
+        acquiredDSFile["kwarg_mask"] = kwarg_mask
+        acquiredDSFile["target_desc"] = target_desc
+        acquiredDSFile["src"] = src
+
+        train_ds = self.writeDataset()
+        encounters = len(train_ds)
+
+        acquiredDSFile["encounters"] = encounters
+        acquiredDSFile["n_obs"] = encounters if not single_lead_obs else encounters * n_leads
+        acquiredDSFile["dataset"] = train_ds
+
+        if test_train_split is None:
+            torch.save(acquiredDSFile, dst + "/" + target_desc)
+            return
+
+        test_ds = {}
+        acquiredDSFile_test = acquiredDSFile.copy()
+
+        tr_encounters = int(encounters * test_train_split)
+        te_encounters = encounters - tr_encounters
+
+        acquiredDSFile["encounters"] = tr_encounters
+        acquiredDSFile["n_obs"] = tr_encounters if not single_lead_obs else tr_encounters * n_leads
+
+        for _ in range(te_encounters):
+            key = list(train_ds.keys())[random.randint(0, len(train_ds) - 1)]
+            val = train_ds.pop(key)
+            test_ds[key] = val
+
+        acquiredDSFile_test["encounters"] = te_encounters
+        acquiredDSFile_test["n_obs"] = te_encounters if not single_lead_obs else te_encounters * n_leads
+        acquiredDSFile_test["dataset"] = test_ds
+
+        torch.save(acquiredDSFile, dst + "/TRAIN-" + "-".join(target_desc.split(" ")))
+        torch.save(acquiredDSFile_test, dst + "/TEST-" + "-".join(target_desc.split(" ")))
         return
 
 
@@ -52,7 +83,7 @@ class datasetAcquirer:
         :return: write the DS (DataSet) as a .pt object
         """
         dataset = {}
-        for filename in os.listdir(self.src)[12000:]:
+        for filename in os.listdir(self.src):
             try:
                 if filename[-4:] == ".xml":
                     ecg, tree = self.readxml(filename)
@@ -62,7 +93,11 @@ class datasetAcquirer:
                     continue
             except:
                 continue
-            dataset[filename] = self.getTarget(ecg, tree)
+
+            try:
+                dataset[filename] = self.getTarget(ecg, tree)
+            except:
+                continue
         return dataset
 
 
@@ -149,18 +184,16 @@ class datasetAcquirer:
         :return: (tensor) or (list of tensors) of the target. If (list) then single_lead_obs=True, a tensor for each lead
         """
         # TODO Acquire target here
-        b1 = torch.vstack((ecg[0:3, 0:2496], ecg[6, 0:2496]))
-        b2 = torch.vstack((ecg[2:5, 2500:3748], ecg[1, 2500:3748], ecg[6, 2500:3748]))
-        b3 = torch.vstack((ecg[5:, 3752:], ecg[1:3, 3752:]))
-        b1_max = torch.max(b1).item()
-        b2_max = torch.max(b2).item()
-        b3_max = torch.max(b3).item()
-        return torch.max(torch.Tensor([b1_max, b2_max, b3_max]))
+        qrs_times = tree.find(".//QRSTimesTypes").findall(".//QRS")
+        if int(qrs_times[-1].find("Time").text) > 5000:
+            raise Exception()
+        return torch.Tensor([len(qrs_times)])
 
 start = time.time()
 acquire = datasetAcquirer(src="/home/rylan/May_2019_XML",
-                          outfile="/home/rylan/DeepLearningRuns/MaxAmplitudeByLead/AF/Test-max-amps-AF.pt",
-                          target_desc="Max Amplitude across all Leads",
+                          dst="/home/rylan/DeepLearningRuns/Beats",
+                          test_train_split=0.75,
+                          target_desc="Heart Beats in Signal",
                           n_leads=8,
                           single_lead_obs=False,
                           filter_artifacts=True)
