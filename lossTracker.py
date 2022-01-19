@@ -56,6 +56,8 @@ class LossTracker:
 
     def saveEpoch(self, epoch):
         if epoch < self.startepoch: return
+        if epoch == 7:
+            print()
         self.x_best += (torch.rand(self.capacity) + epoch).tolist()
         self.x_worst += (torch.rand(self.capacity) + epoch).tolist()
         for i in range(self.capacity):

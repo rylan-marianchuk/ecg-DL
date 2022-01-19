@@ -72,8 +72,8 @@ class datasetAcquirer:
         acquiredDSFile_test["n_obs"] = te_encounters if not single_lead_obs else te_encounters * n_leads
         acquiredDSFile_test["dataset"] = test_ds
 
-        torch.save(acquiredDSFile, dst + "/TRAIN-" + "-".join(target_desc.split(" ")))
-        torch.save(acquiredDSFile_test, dst + "/TEST-" + "-".join(target_desc.split(" ")))
+        torch.save(acquiredDSFile, dst + "/TRAIN-" + "-".join(target_desc.split(" ")) + ".pt")
+        torch.save(acquiredDSFile_test, dst + "/TEST-" + "-".join(target_desc.split(" ")) + ".pt")
         return
 
 

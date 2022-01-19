@@ -169,7 +169,7 @@ class ecgDataset(Dataset):
         if not self.single_lead_obs:
             master_title += "<br>Target:  " + str(targets)
             if self.prediction_assigned:
-                master_title += "<br>Prediction:  " + str(self.predictions[index])
+                master_title += "<br>Prediction:  " + str(self.predictions[self.prediction_ids.index(str(index))])
 
         fig.update_layout(title_text=master_title)
 
@@ -215,12 +215,16 @@ class ecgDataset(Dataset):
         :return:
         """
         hovertexts = []
-        x = torch.zeros(len(self) * self.n_leads)
+        x = torch.zeros(self.n_obs)
 
-        for i in range(len(self)):
-            for j,lead in enumerate((self.lead_names)):
-                hovertexts.append(str(i) + " " + lead)
-                x[i*self.n_leads + j] = self.targets[i][j].item()
+        for i in range(self.n_obs):
+            if self.single_lead_obs:
+                for j,lead in enumerate((self.lead_names)):
+                    hovertexts.append(str(i) + " " + lead)
+                    x[i*self.n_leads + j] = self.targets[i][j].item()
+            else:
+                hovertexts.append(str(i))
+                x[i] = self.targets[i].item()
 
         f = go.Figure(data=[go.Scatter(x=x, y=torch.rand(len(self) * self.n_leads),
                                        hovertext=hovertexts, mode='markers', marker=dict())])
