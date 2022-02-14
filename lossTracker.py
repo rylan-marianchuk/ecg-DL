@@ -4,8 +4,13 @@ import plotly.graph_objs as go
 import numpy as np
 
 class LossTracker:
-    def __init__(self, dataset, capacity=10, startepoch=0):
+    def __init__(self, dataset, batch_size, capacity=10, startepoch=0):
+        # Ensure capacity is less than batch size
         self.capacity = capacity
+        if batch_size < capacity:
+            self.capacity = batch_size
+
+        self.current_epoch = -1
         self.best = []
         self.worst = []
         self.empty = True
@@ -27,10 +32,12 @@ class LossTracker:
         self.best = []
         self.worst = []
         self.empty = True
+        self.current_epoch += 1
 
 
 
     def lossBatch(self, losses, ids, y_true, y_pred):
+        if self.current_epoch < self.startepoch: return
         sort = torch.argsort(losses)
         if self.empty:
             self.empty = False
@@ -54,12 +61,11 @@ class LossTracker:
             else: break
 
 
-    def saveEpoch(self, epoch):
-        if epoch < self.startepoch: return
-        if epoch == 7:
-            print()
-        self.x_best += (torch.rand(self.capacity) + epoch).tolist()
-        self.x_worst += (torch.rand(self.capacity) + epoch).tolist()
+    def saveEpoch(self):
+        if self.current_epoch < self.startepoch: return
+
+        self.x_best += (torch.rand(self.capacity) + self.current_epoch).tolist()
+        self.x_worst += (torch.rand(self.capacity) + self.current_epoch).tolist()
         for i in range(self.capacity):
             self.y_best.append(-self.best[i][0])
             self.ids_best.append(self.best[i][1])
@@ -74,6 +80,7 @@ class LossTracker:
 
 
     def viewLossTrackerPlots(self, highlight_over_n_instances=5, saveToDisk=False):
+        if self.empty: return
         self.viewLossTrackerPlot("Worst 20 losses tracked over epochs", self.x_worst, self.y_worst, self.ids_worst, self.trues_worst, self.preds_worst,
                                   highlight_over_n_instances, saveToDisk)
 

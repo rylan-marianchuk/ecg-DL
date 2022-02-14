@@ -46,9 +46,58 @@ def evaluateContinuous(te_dataloader, ds_test, model, device, batch_size, saveTo
         D = {'ids':hovertexts, 'y_true':y_true, 'y_pred':y_pred}
         torch.save(D, "true-pred-test.pt")
 
-def evaluateBinary():
+def evaluateBinary(te_dataloader, ds_test, model, device, batch_size, saveToDisk=False):
+    """
+    Execute the test set on a trained model, evaluate its predictive performance
+    :param te_dataloader: (DataLoader object from torch.utils.data.dataloader) test set dataloader
+    :param ds_test (ecgDataset object) test set dataset
+    :param model: trained model, callable given input features
+    :param device: cpu or cuda
+    :param batch_size: (int)
+    :param saveToDisk: (bool) whether to save as html file
+    """
+    S = torch.nn.Sigmoid()
+    model.eval()
+    with torch.no_grad():
+        y_pred = torch.zeros(ds_test.n_obs)
+        y_true = torch.zeros(ds_test.n_obs)
+        hovertexts = []
+        batch = 0
+        for X, y, ids in te_dataloader:
+            X = X.to(device)
+            y = y.to(device)
+            prediction = model(X)
+            if ds_test.single_lead_obs:
+                l = batch * batch_size * ds_test.n_leads
+                r = (batch + 1) * batch_size * ds_test.n_leads
+            else:
+                l = batch * batch_size
+                r = (batch + 1) * batch_size
+            y_pred[l:r] = S(prediction.flatten())
+            y_true[l:r] = y
+            hovertexts += ids
+            batch += 1
+
+    L = torch.nn.BCEWithLogitsLoss()
+    rmeanloss = L(y_pred, y_true)
+    print("Test Root Mean loss:  " + str(rmeanloss))
+
+    AUC(y_true, y_pred, saveToDisk=saveToDisk)
+    AUPRC(y_true, y_pred, saveToDisk=saveToDisk)
+
+    if saveToDisk:
+        D = {'ids': hovertexts, 'y_true': y_true, 'y_pred': y_pred}
+        torch.save(D, "true-pred-test.pt")
     return
 
+def AUPRC(y_true, y_score, saveToDisk=False):
+    """
+    Generate a Precision Recall Curve
+    :param y_true: binary
+    :param y_score: sigmoid probabilities
+    :param saveToDisk: (bool) whether to save as html file
+    """
+    return
 
 def AUC(y_true, y_score, saveToDisk=False):
     """

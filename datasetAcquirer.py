@@ -184,16 +184,16 @@ class datasetAcquirer:
         :return: (tensor) or (list of tensors) of the target. If (list) then single_lead_obs=True, a tensor for each lead
         """
         # TODO Acquire target here
-        qrs_times = tree.find(".//QRSTimesTypes").findall(".//QRS")
-        if int(qrs_times[-1].find("Time").text) > 5000:
-            raise Exception()
-        return torch.Tensor([len(qrs_times)])
+        fs = int(tree.findall('.//Waveform')[1].find("SampleBase").text)
+        if fs == 250:
+            return torch.Tensor([1])
+        return torch.Tensor([0])
 
 start = time.time()
 acquire = datasetAcquirer(src="/home/rylan/May_2019_XML",
-                          dst="/home/rylan/DeepLearningRuns/Beats",
+                          dst="/home/rylan/DeepLearningRuns/Upsample",
                           test_train_split=0.75,
-                          target_desc="Heart Beats in Signal",
+                          target_desc="Whether the signal was upsampled",
                           n_leads=8,
                           single_lead_obs=False,
                           filter_artifacts=True)
