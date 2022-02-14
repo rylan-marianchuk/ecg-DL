@@ -64,7 +64,7 @@ def weights(signal):
     seg_size = 1250
     segments = 5000 // seg_size
     remainder = 5000 % seg_size
-    nlags = 30
+    nlags = 50
 
     ACFs = torch.zeros(segments, nlags+1)
     cosSim = nn.CosineSimilarity(dim=0)

@@ -4,10 +4,13 @@ from torch.utils.data import Dataset
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 import pandas as pd
+import numpy as np
+import h5py
+
 
 class ecgDataset(Dataset):
 
-    def __init__(self, acquiredDSFile, transform=None):
+    def __init__(self, acquiredDSFile, h5=False, transform=None):
         """
         Dataset is ordered
         :param acquiredDSFile: (str) to the .pt datatset
@@ -27,9 +30,11 @@ class ecgDataset(Dataset):
         self.prediction_assigned = False
         self.predictions = torch.Tensor([])
         self.prediction_ids = []
+        self.h5files = h5
+        self.up = torch.nn.Upsample(scale_factor=2, mode='linear', align_corners=False)
 
     def __len__(self):
-        return self.acquiredDSFile["encounters"]
+        return self.encounters
 
 
     def __getitem__(self, idx):
@@ -51,7 +56,11 @@ class ecgDataset(Dataset):
 
 
     def singleidx(self, id):
-        ecg = getLeads(self.src + "/" + self.filenames[id], self.n_leads)
+        if self.h5files:
+            path = "/home/rylan/xmls_AS_h5/" + self.filenames[id]
+            ecg = self.readh5(path)
+        else:
+            ecg = getLeads(self.src + "/" + self.filenames[id], self.n_leads)
         s_id = str(id)
         if self.transform is not None:
             ecg = self.transform(ecg)
@@ -64,6 +73,19 @@ class ecgDataset(Dataset):
         for id in idx:
             return self.singleidx(id)
 
+
+    def readh5(self, path):
+        """
+        Read an .h5 file and return its torch tensor
+        :param path: path to .h5 file to read into torch tensor
+        :return: (tensor) shape=(8, 5000)
+        """
+        f = h5py.File(path)
+        np_ecg = np.array(f["ECG"])
+        ecg = torch.from_numpy(np_ecg)
+        if ecg.shape[1] == 2500:
+            ecg = self.up(ecg.unsqueeze(0))[0]
+        return ecg
 
     def denoteArtifact(self, index, leadid):
         """
@@ -104,7 +126,8 @@ class ecgDataset(Dataset):
 
         if leadid is not None:
             lead_index = self.lead_names.index(leadid)
-            fig = go.Figure(go.Scatter(y=ecg[lead_index], mode='markers', marker=dict(color='red')))
+            signal = ecg[lead_index]
+            fig = go.Figure(go.Scatter(y=signal, mode='markers', marker=dict(color='red')))
             target_str = str(targets[lead_index]) if self.single_lead_obs else str(targets)
             title = "Electrocardiogram of dataset index <b>" + str(index) + " " + leadid + \
                     "</b><br>File:  " + filename + \

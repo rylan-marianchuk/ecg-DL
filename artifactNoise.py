@@ -8,6 +8,32 @@ import numpy as np
 from transforms import Wavelet
 from decodeLeads import getNbeats
 
+
+def CEEMD(signal):
+    imfs, noise = emd.sift.complete_ensemble_sift(signal.numpy())
+    fixed = False
+    for i in range(1, imfs.shape[1] + 1):
+        f = imfs[:, -i]
+        zcr = ((f[:-1] * f[1:]) < 0).sum() / 2
+        if zcr >= 1.5:
+            scat = go.Figure(go.Scatter(y=f, mode='markers', marker=dict(color='green')))
+            scat.show()
+            signal -= torch.from_numpy(f)
+            fixed = True
+            break
+    if not fixed:
+        raise Exception("Did not find a imf to subtract")
+    return signal
+
+
+def waveletDenoise(signal):
+    L = 8
+    detail_coeffs = pywt.wavedec(signal, 'db8', level=L)
+    detail_coeffs[-L] = np.zeros(detail_coeffs[-L].shape[0])
+    build = pywt.waverec(detail_coeffs, 'db8')
+    signal_pres = build
+    return signal_pres
+
 def checkZeroVec(ecg):
     """
     :param ecg: (tensor) dtype=float32, shape=(8, 5000) the given lead signals of the ECG
