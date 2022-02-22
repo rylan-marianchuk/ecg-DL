@@ -3,22 +3,21 @@ import time
 import torch
 from pydicom import dcmread
 import xml.etree.ElementTree as ET
-from decodeLeads import getLeads
+from xmlExtract import getLeads
 from artifactNoise import checkZeroVec
 import random
 
 class datasetAcquirer:
 
-    def __init__(self, src, dst, target_desc, test_train_split=None, n_leads=8, single_lead_obs=False, filter_artifacts=True, **kwarg_mask):
+    def __init__(self, src, dst, target_desc, test_train_split=None, n_leads=8, single_lead_obs=False, **kwarg_mask):
         """
-        :param src: collection of Electrocardiograms in either DICOM or XML filetype #TODO directory or SQL db?
+        :param src: directory of Electrocardiograms in either DICOM or XML or H5 filetype
         :param dst: (str) output directory to place datasets (train & test)
-        :param target_desc: (str) a high level description of the target for this dataset
+        :param target_desc: (str) a high level description of the target for this dataset, used in output file naming
         :param test_train_split: (float) if None, do not split the dataset. If float between 0 and 1, apply proportion
                                 split and save two datasets.
         :param n_leads: (int) 8 or 12, the number of leads desired. If 12, leads III, aVR, aVF, aVL are computed
         :param single_lead_obs: (bool) whether to count each lead as an independent observation in the dataset
-        :param filter_artifacts: (bool) whether to apply automated signal artifact detection, throwing away artifacts
         :param kwarg_mask: (dict) key-value pairs to include in dataset may contain:
             "BUID" : {buid : "", ...}
             "EUID" : {euid : "", ...}
@@ -54,6 +53,7 @@ class datasetAcquirer:
             torch.save(acquiredDSFile, dst + "/" + target_desc)
             return
 
+        # Otherwise now split the dataset randomly, popping from the training set and adding to test set
         test_ds = {}
         acquiredDSFile_test = acquiredDSFile.copy()
 
@@ -103,23 +103,29 @@ class datasetAcquirer:
 
 
     def readxml(self, filename):
+        """
+        Read the xml file specified from src
+        :param filename: (str) xml filename
+        :return: (tensor) dtype=float32, shape=(8, 5000) the given lead signals of the ECG and (object) xml element tree
+        """
         tree = ET.parse(self.src + "/" + filename)
         self.filterXml(tree)
         ecg = getLeads(self.src + "/" + filename, self.n_leads)
-        if self.filter_artifacts:
-            self.filterArtifacts(ecg)
         return ecg, tree
 
 
     def readdcm(self, filename):
+        """
+        Read the .dcm file specified from src
+        :param filename: (str) dcm filename
+        :return: (tensor) dtype=float32, shape=(8, 5000) the given lead signals of the ECG and (object) xml element tree
+        """
         with open(self.src + "/" + filename, 'rb') as to_read:
             ds = dcmread(to_read)
         xml_string = ds.EncapsulatedDocument.decode(encoding='utf-8')
         tree = ET.fromstring(xml_string)
         self.filterXml(tree)
         ecg = getLeads(self.src + "/" + filename, self.n_leads)
-        if self.filter_artifacts:
-            self.filterArtifacts(ecg)
         return ecg, tree
 
 
@@ -161,19 +167,6 @@ class datasetAcquirer:
             if formatted > self.kwarg_mask["newest"]: raise Exception()
 
         # Reached here, all checks passed.
-        return
-
-
-    def filterArtifacts(self, ecg):
-        """
-        Throwing an exception if any signal not acceptable
-        :param ecg: (tensor) dtype=float32, shape=(8, 5000) the given lead signals of the ECG
-        :return: None
-        """
-        # TODO implement artifact detection algorithm
-        if checkZeroVec(ecg): raise Exception()
-
-
         return
 
 

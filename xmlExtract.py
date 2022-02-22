@@ -25,8 +25,8 @@ def getLeads(path2file, n_leads):
         encodedStr = lead_xml.find("WaveFormData").text
         lead_ID = lead_xml.find("LeadID").text
         to_decode = base64.b64decode(encodedStr)
-        # TODO Multiply or Divide by 4.88 here?
         T = torch.tensor(array.array('h', to_decode), dtype=torch.float32)
+        # Upsample to 250 if needed
         if fs == 250:
             T = up(T.unsqueeze(0).unsqueeze(0)).flatten()
         ECG_lead_dict[lead_ID] = T

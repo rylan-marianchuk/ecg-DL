@@ -1,5 +1,5 @@
 import torch
-from decodeLeads import getLeads
+from xmlExtract import getLeads
 from torch.utils.data import Dataset
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
@@ -85,7 +85,8 @@ class ecgDataset(Dataset):
         ecg = torch.from_numpy(np_ecg)
         if ecg.shape[1] == 2500:
             ecg = self.up(ecg.unsqueeze(0))[0]
-        return ecg
+        # H5s are stored in 1D, change the view to have each row a lead
+        return ecg.view(8, 5000)
 
     def denoteArtifact(self, index, leadid):
         """
@@ -105,7 +106,8 @@ class ecgDataset(Dataset):
 
     def assignPredictions(self, preds):
         """
-        :param preds: (tensor) of model outputs, shape=(n_obs,)
+        Assign to the internal class the result file
+        :param preds: (str) file name, the "true-pred-test/train.pt" file
         """
         pred_true_file = torch.load(preds)
         self.predictions = pred_true_file["y_pred"]
@@ -115,10 +117,11 @@ class ecgDataset(Dataset):
 
     def viewECG(self, index, leadid=None, saveToDisk=False):
         """
-
-        :param index:
-        :param leadid:
-        :return:
+        Generate a ECG web viewer with plotly, overlaying target, predictions (if assigned), and id
+        :param index: (int) the identifier of this observation, in range [0, len(self))
+        :param leadid: (str) only if single_lead_obs=True, must pair this parameter to view only a single lead
+                        must be in self.leadnames
+        :return: None, generate web tab with the viewable ECG or save to disk
         """
         ecg = getLeads(self.src + "/" + self.filenames[index], self.n_leads)
         targets = self.targets[index]
@@ -234,8 +237,8 @@ class ecgDataset(Dataset):
     def viewTargetDistribution(self, saveToDisk=False):
         """
         Only fit for Regression
-        # TODO allow classification
-        :return:
+        Generate a violin and scatter plot of all the targets assigned to this dataset
+        :return: None, generate plots in web tab, or save to disk
         """
         hovertexts = []
         x = torch.zeros(self.n_obs)

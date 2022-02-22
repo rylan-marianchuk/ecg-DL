@@ -18,10 +18,12 @@ def evaluateContinuous(te_dataloader, ds_test, model, device, batch_size, saveTo
     """
     model.eval()
     with torch.no_grad():
+        # Vectors to store results
         y_pred = torch.zeros(ds_test.n_obs)
         y_true = torch.zeros(ds_test.n_obs)
-        hovertexts = []
+        hovertexts = []  # list to allow for ids to be strings
         batch = 0
+        # Execute the model on test set, populating the above containers
         for X, y, ids in te_dataloader:
             X = X.to(device)
             y = y.to(device)
@@ -37,18 +39,27 @@ def evaluateContinuous(te_dataloader, ds_test, model, device, batch_size, saveTo
             hovertexts += ids
             batch += 1
 
+        # Get the rmse loss of the entire test set
         rmeanloss = torch.mean(torch.sqrt((y_true - y_pred) * (y_true - y_pred)))
         print("Test Root Mean loss:  " + str(rmeanloss))
+        # Generate prediction plots
         regression_performance(y_true, y_pred, hovertexts, saveToDisk)
         bland_altman(y_true, y_pred, hovertexts, saveToDisk)
 
     if saveToDisk:
         D = {'ids':hovertexts, 'y_true':y_true, 'y_pred':y_pred}
         torch.save(D, "true-pred-test.pt")
+        # Save the dictionary to a csv for viewing, rounding the decimals
+        D["y_pred"] = np.around(D["y_pred"], decimals=4)
+        frame = pd.DataFrame(D)
+        frame.to_csv("true-pred-test.csv", index=False)
+    return
+
 
 def evaluateBinary(te_dataloader, ds_test, model, device, batch_size, saveToDisk=False):
     """
-    Execute the test set on a trained model, evaluate its predictive performance
+    Execute the test set on a trained model, evaluate its predictive performance for a binary classification problem
+    All the same as continuous evaluation, but now using different loss and sigmoid activation
     :param te_dataloader: (DataLoader object from torch.utils.data.dataloader) test set dataloader
     :param ds_test (ecgDataset object) test set dataset
     :param model: trained model, callable given input features
@@ -88,7 +99,12 @@ def evaluateBinary(te_dataloader, ds_test, model, device, batch_size, saveToDisk
     if saveToDisk:
         D = {'ids': hovertexts, 'y_true': y_true, 'y_pred': y_pred}
         torch.save(D, "true-pred-test.pt")
+        # Save the dictionary to a csv for viewing, rounding the decimals
+        D["y_pred"] = np.around(D["y_pred"], decimals=4)
+        frame = pd.DataFrame(D)
+        frame.to_csv("true-pred-test.csv", index=False)
     return
+
 
 def AUPRC(y_true, y_score, saveToDisk=False):
     """
@@ -98,6 +114,7 @@ def AUPRC(y_true, y_score, saveToDisk=False):
     :param saveToDisk: (bool) whether to save as html file
     """
     return
+
 
 def AUC(y_true, y_score, saveToDisk=False):
     """
@@ -120,8 +137,7 @@ def AUC(y_true, y_score, saveToDisk=False):
     fig = px.area(
         x=fpr, y=tpr,
         title=f'ROC Curve (AUC={auc(fpr, tpr):.4f})',
-        labels=dict(x='False Positive Rate', y='True Positive Rate'),
-        width=700, height=500
+        labels=dict(x='False Positive Rate', y='True Positive Rate')
     )
     fig.add_shape(
         type='line', line=dict(dash='dash'),
@@ -135,6 +151,7 @@ def AUC(y_true, y_score, saveToDisk=False):
         fig.write_html("./ROC-AUC.html")
     else:
         fig.show()
+    return
 
 
 def regression_performance(y_true, y_pred, hovertexts, saveToDisk=False):
@@ -171,6 +188,7 @@ def regression_performance(y_true, y_pred, hovertexts, saveToDisk=False):
         fig.write_html("./correlation-true-pred.html")
     else:
         fig.show()
+    return
 
 
 def bland_altman(y_true, y_pred, hovertexts, saveToDisk=False):
@@ -201,3 +219,4 @@ def bland_altman(y_true, y_pred, hovertexts, saveToDisk=False):
         fig.write_html("./blandaltman-true-pred.html")
     else:
         fig.show()
+    return
