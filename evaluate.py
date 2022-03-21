@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import plotly.express as px
 import plotly.graph_objs as go
@@ -220,3 +221,26 @@ def bland_altman(y_true, y_pred, hovertexts, saveToDisk=False):
     else:
         fig.show()
     return
+
+
+def compare_binary(true_pred_file, threshold, dataset):
+    """
+
+    :param true_pred_file: "true-pred-test/train.pt" to acquire the two groups of signals
+    :param threshold: (float) in (0, 1) the decision boundary to divide probability outputs into two classes
+    """
+    id_true_pred_dict = torch.load(true_pred_file)
+
+    ds = torch.load(dataset)
+    ds_filenames = np.array(list(ds["dataset"].keys()))
+
+    ids = np.array(id_true_pred_dict["ids"], dtype=np.int_)
+    pred = np.array(id_true_pred_dict["y_pred"])
+
+    class_0_ids = ids[pred <= threshold]
+    class_0_filenames = ds_filenames[class_0_ids]
+    class_1_ids = ids[pred > threshold]
+    class_1_filenames = ds_filenames[class_1_ids]
+
+
+compare_binary("/home/rylan/DeepLearningRuns/Upsample/MayoAge/true-pred-test.pt", 0.5, "/home/rylan/DeepLearningRuns/Upsample/TEST-Whether-the-signal-was-upsampled.pt")
