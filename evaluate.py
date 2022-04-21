@@ -29,15 +29,11 @@ def evaluateContinuous(te_dataloader, ds_test, model, device, batch_size, saveTo
             X = X.to(device)
             y = y.to(device)
             prediction = model(X)
-            if ds_test.single_lead_obs:
-                l = batch*batch_size*ds_test.n_leads
-                r = (batch+1)*batch_size*ds_test.n_leads
-            else:
-                l = batch*batch_size
-                r = (batch+1)*batch_size
+            l = batch*batch_size
+            r = (batch+1)*batch_size
             y_pred[l:r] = prediction.flatten()
             y_true[l:r] = y
-            hovertexts += ids
+            hovertexts += ids.tolist()
             batch += 1
 
         # Get the rmse loss of the entire test set
@@ -79,12 +75,8 @@ def evaluateBinary(te_dataloader, ds_test, model, device, batch_size, saveToDisk
             X = X.to(device)
             y = y.to(device)
             prediction = model(X)
-            if ds_test.single_lead_obs:
-                l = batch * batch_size * ds_test.n_leads
-                r = (batch + 1) * batch_size * ds_test.n_leads
-            else:
-                l = batch * batch_size
-                r = (batch + 1) * batch_size
+            l = batch * batch_size
+            r = (batch + 1) * batch_size
             y_pred[l:r] = S(prediction.flatten())
             y_true[l:r] = y
             hovertexts += ids
@@ -168,11 +160,13 @@ def regression_performance(y_true, y_pred, hovertexts, saveToDisk=False):
     df['True'] = y_true
     df['l'] = hovertexts
 
+    r = torch.corrcoef(torch.vstack((y_pred, y_true)))[0,1].item()
+
     fig = px.scatter(
         df, y='True', x='Prediction',
         hover_data='l',
         marginal_x='histogram', marginal_y='histogram',
-        title="Correlation Plot of True vs. Predicted",
+        title="Correlation Plot of True vs. Predicted <br>r=" + str(r),
         opacity=0.6
     )
 

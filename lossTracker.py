@@ -127,7 +127,7 @@ class LossTracker:
                 f.add_trace(go.Scatter(x=x_epoch_noise[indices].flatten(),
                                        y=y_losses[indices].flatten(),
                                        mode='lines+markers',
-                                       name=id,
+                                       name=str(id),
                                        marker_color=colors[i],
                                        hovertemplate='%{text}'+
                                                      '<br><b>log10 MSE Loss<b>: %{y:.2f}'+

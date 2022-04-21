@@ -66,13 +66,15 @@ def viewECG(filename, lead=None, save_to_disk=False):
     return
 
 def viewArtifacted(quality_db_path, tab_batch_size=5):
+    lead_names = ["I", "II", "V1", "V2", "V3", "V4", "V5", "V6"]
     conx = sqlite3.connect(quality_db_path)
-    res = conx.execute("SELECT EUID FROM quality_flag WHERE QUALITY=1")
+    res = conx.execute("SELECT EUID FROM quality_flag WHERE EUID IN (SELECT EUID FROM quality_flag WHERE QUALITY=1 ORDER BY RANDOM())")
     flagged_files = res.fetchall()
     count = 0
     for filename_dot_lead in flagged_files:
         filename, lead = filename_dot_lead[0].split(".")
         viewECG(filename + ".xml", lead=int(lead))
+        print(filename + ".xml", lead_names[int(lead)])
         count += 1
         if count == tab_batch_size:
             input("Continue... ")

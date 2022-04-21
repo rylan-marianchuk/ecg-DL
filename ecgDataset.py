@@ -70,6 +70,7 @@ class ecgDataset(Dataset):
 
 
     def numerousidx(self, idx):
+        print("Hello from numerous load")
         for id in idx:
             return self.singleidx(id)
 
