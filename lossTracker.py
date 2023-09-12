@@ -4,11 +4,16 @@ import plotly.graph_objs as go
 import numpy as np
 
 class LossTracker:
-    def __init__(self, dataset, batch_size, capacity=10, startepoch=0):
+    def __init__(self, dataset, batch_size, capacity=10, startepoch=0, validation_track=False):
         # Ensure capacity is less than batch size
         self.capacity = capacity
         if batch_size < capacity:
             self.capacity = batch_size
+
+        self.validation_track = validation_track
+        if self.validation_track:
+            self.
+
 
         self.current_epoch = -1
         self.best = []
@@ -26,6 +31,14 @@ class LossTracker:
         self.preds_worst = []
         self.ds = dataset
         self.startepoch = startepoch
+
+
+    def earlyStop(self):
+        if not self.validation_track:
+            raise Exception("Can only handle early stopping if this is a validation dataset")
+        self.current_epoch += 1
+
+
 
 
     def newEpoch(self):

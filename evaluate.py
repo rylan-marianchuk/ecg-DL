@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import torch
 import plotly.express as px
@@ -237,4 +239,30 @@ def compare_binary(true_pred_file, threshold, dataset):
     class_1_filenames = ds_filenames[class_1_ids]
 
 
-compare_binary("/home/rylan/DeepLearningRuns/Upsample/MayoAge/true-pred-test.pt", 0.5, "/home/rylan/DeepLearningRuns/Upsample/TEST-Whether-the-signal-was-upsampled.pt")
+def output_predictions(dataloader, model, unsqueeze=True, sliceX=None):
+    model = model.to("cuda")
+    ds = dataloader.dataset
+    predictions = torch.zeros(len(ds))
+    ids = torch.zeros(len(ds), dtype=torch.long)
+    batch = 0
+    bs = dataloader.batch_size
+    with torch.no_grad():
+        for X, y, id in dataloader:
+            if sliceX is not None:
+                X = X[sliceX]
+            if unsqueeze:
+                X = X.unsqueeze(1)
+            predict = model(X.to("cuda")).flatten().to("cpu")
+            predictions[batch * bs : (batch + 1) * bs] = predict
+            ids[batch * bs : (batch + 1) * bs] = id
+            batch += 1
+
+    predictions = predictions[torch.argsort(ids)]
+    # Save the prediction dataframe as csv
+    pd.DataFrame({
+        "EUID": ds.filenames,
+        "id": ds.ids,
+        "target": ds.targets,
+        "prediction": predictions
+    }).to_csv(os.getcwd() + "/" + ds.xml_dataset[:-4] + "-predictions.csv", index=False)
+    return 
